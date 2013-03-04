@@ -1,0 +1,29 @@
+{
+  "name": "pcap-dgram",
+  "description": "Mock UDP socket based on pcap file data.",
+  "keywords": [
+    "udp",
+    "datagram",
+    "mock",
+    "stream",
+    "streams2",
+    "composable-object-stream"
+  ],
+  "version": "0.0.0",
+  "author": "Ben Kelly <ben@wanderview.com>",
+  "license": "BSD",
+  "dependencies": {
+    "readable-stream": "~0.3.0"
+  },
+  "devDependencies": {
+    "nodeunit": "~0.7.4"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:wanderview/node-mock-dgram.git"
+  },
+  "scripts": {
+    "test": "nodeunit test"
+  },
+  "main": "dgram.js"
+}
