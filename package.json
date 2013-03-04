@@ -1,6 +1,6 @@
 {
-  "name": "pcap-dgram",
-  "description": "Mock UDP socket based on pcap file data.",
+  "name": "mock-dgram",
+  "description": "Mock UDP socket using object streams",
   "keywords": [
     "udp",
     "datagram",
