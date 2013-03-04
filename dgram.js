@@ -46,19 +46,35 @@ function MockDgram(opts) {
   self.input = new PassThrough({objectMode: true});
   self.output = new PassThrough({objectMode: true});
 
+  self._paused = !!opts.paused;
+
+  if (!self._paused) {
+    process.nextTick(this._doRead.bind(this));
+  }
+
   return self;
 }
 
 MockDgram.prototype.pause = function() {
-  // TODO: implement pause
+  this._paused = true;
 };
 
 MockDgram.prototype.resume = function() {
-  // TODO: implement resume
+  if (this._paused) {
+    this._paused = false;
+    process.nextTick(this._doRead.bind(this));
+  }
 };
 
 MockDgram.prototype.send = function(buf, offset, length, port, address, cb) {
-  // TODO: implement send
+  var msg = {
+    data: buf.slice(offset, length),
+    ip: { dst: address },
+    udp: { dstPort: port }
+  };
+
+  // No good way to handle back-pressure here unfortunately.
+  this.output.write(msg, null, cb);
 };
 
 MockDgram.prototype.close = function() {
@@ -67,6 +83,26 @@ MockDgram.prototype.close = function() {
 
 MockDgram.prototype.address = function() {
   // TODO: implement address
+};
+
+MockDgram.prototype._doRead = function() {
+  if (this._paused) {
+    return;
+  }
+
+  var msg = this.input.read();
+  if (!msg) {
+    this.input.once('readable', this._doRead.bind(this));
+    return;
+  }
+
+  this._onData(msg);
+
+  return this._doRead();
+};
+
+MockDgram.prototype._onData = function(msg) {
+  // TODO: implement _onData
 };
 
 // Compatibility stubs
