@@ -26,6 +26,8 @@
 module.exports = MockDgram;
 
 var EventEmitter = require('events').EventEmitter;
+var IpHeader = require('ip-header');
+var UdpHeader = require('udp-header');
 var PassThrough = require('stream').PassThrough;
 if (!PassThrough) {
   PassThrough = require('readable-stream/passthrough');
@@ -33,6 +35,8 @@ if (!PassThrough) {
 var util = require('util');
 
 util.inherits(MockDgram, EventEmitter);
+
+var DEFAULT_IP = '0.0.0.0';
 
 function MockDgram(opts) {
   var self = (this instanceof MockDgram)
@@ -44,12 +48,21 @@ function MockDgram(opts) {
   EventEmitter.call(self, opts);
 
   self.input = new PassThrough({objectMode: true});
+  self.input.on('end', self._doEnd.bind(self));
+  self.input.on('error', self.emit.bind(self, 'error'));
+
   self.output = new PassThrough({objectMode: true});
+  self.output.on('end', self._doEnd.bind(self));
+  self.output.on('error', self.emit.bind(self, 'error'));
 
   self._paused = !!opts.paused;
+  self._address = opts.address || DEFAULT_IP;
+  self._port = ~~opts.port;
+  self._defaultSrc = opts.defaultSrc || DEFAULT_IP;
+  self._defaultSrcPort = ~~opts.defaultSrcPort;
 
   if (!self._paused) {
-    process.nextTick(this._doRead.bind(this));
+    process.nextTick(self._doRead.bind(this));
   }
 
   return self;
@@ -69,8 +82,16 @@ MockDgram.prototype.resume = function() {
 MockDgram.prototype.send = function(buf, offset, length, port, address, cb) {
   var msg = {
     data: buf.slice(offset, length),
-    ip: { dst: address },
-    udp: { dstPort: port }
+    ip: new IpHeader({
+      src: this._address,
+      dst: address,
+      protocol: 'udp'
+    }),
+    udp: new UdpHeader({
+      srcPort: this._port,
+      dstPort: port,
+      dataLength: length
+    })
   };
 
   // No good way to handle back-pressure here unfortunately.
@@ -78,11 +99,11 @@ MockDgram.prototype.send = function(buf, offset, length, port, address, cb) {
 };
 
 MockDgram.prototype.close = function() {
-  // TODO: implement close
+  this._doEnd();
 };
 
 MockDgram.prototype.address = function() {
-  // TODO: implement address
+  return { address: this._address, port: this._port, family: 'IPv4' };
 };
 
 MockDgram.prototype._doRead = function() {
@@ -102,7 +123,48 @@ MockDgram.prototype._doRead = function() {
 };
 
 MockDgram.prototype._onData = function(msg) {
-  // TODO: implement _onData
+  if (Buffer.isBuffer(msg)) {
+    msg = { data: msg };
+  }
+
+  msg.ip = msg.ip || {};
+  msg.ip.src = msg.ip.src || this._defaultSrc;
+
+  msg.udp = msg.udp || {};
+  msg.udp.srcPort = typeof msg.udp.srcPort === 'number'
+                  ? msg.udp.srcPort : this._defaultSrcPort;
+  msg.udp.dataLength = (msg.data && msg.data.length) ? msg.data.length : 0;
+
+  msg.offset = ~~msg.offset;
+
+  // auto-configure destination IP address if not already set
+  if (this._address === DEFAULT_IP && msg.ip.dst) {
+    this._address = msg.ip.dst;
+  }
+
+  // auto-configure destination UDP port if not already set
+  if (!this._port && msg.udp.dstPort) {
+    this._port = msg.udp.dstPort;
+  }
+
+  var rinfo = {
+    address: msg.ip.src,
+    port: msg.udp.srcPort,
+    length: msg.udp.dataLength
+  };
+
+  this.emit('message', msg.data, rinfo);
+};
+
+MockDgram.prototype._doEnd = function() {
+  this._doEnd = function() {};
+  this._onData = function() {};
+  this.send = function() { throw new Error('Not running'); };
+
+  this.input.end();
+  this.output.end();
+
+  this.emit('close');
 };
 
 // Compatibility stubs
