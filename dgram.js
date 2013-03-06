@@ -48,11 +48,11 @@ function MockDgram(opts) {
   EventEmitter.call(self, opts);
 
   self.input = new PassThrough({objectMode: true});
-  self.input.on('end', self._doEnd.bind(self));
+  self.input.on('end', function() { self._doEnd() });
   self.input.on('error', self.emit.bind(self, 'error'));
 
   self.output = new PassThrough({objectMode: true});
-  self.output.on('end', self._doEnd.bind(self));
+  self.output.on('end', function() { self._doEnd() });
   self.output.on('error', self.emit.bind(self, 'error'));
 
   self._paused = !!opts.paused;
@@ -150,7 +150,7 @@ MockDgram.prototype._onData = function(msg) {
   var rinfo = {
     address: msg.ip.src,
     port: msg.udp.srcPort,
-    length: msg.udp.dataLength
+    size: msg.udp.dataLength
   };
 
   this.emit('message', msg.data, rinfo);
