@@ -127,15 +127,16 @@ MockDgram.prototype._onData = function(msg) {
     msg = { data: msg };
   }
 
+  msg.offset = ~~msg.offset;
+
   msg.ip = msg.ip || {};
   msg.ip.src = msg.ip.src || this._defaultSrc;
 
   msg.udp = msg.udp || {};
   msg.udp.srcPort = typeof msg.udp.srcPort === 'number'
                   ? msg.udp.srcPort : this._defaultSrcPort;
-  msg.udp.dataLength = (msg.data && msg.data.length) ? msg.data.length : 0;
-
-  msg.offset = ~~msg.offset;
+  msg.udp.dataLength = msg.udp.dataLength ||
+    (msg.data && msg.data.length) ? (msg.data.length - msg.offset) : 0;
 
   // auto-configure destination IP address if not already set
   if (this._address === DEFAULT_IP && msg.ip.dst) {
@@ -153,7 +154,7 @@ MockDgram.prototype._onData = function(msg) {
     size: msg.udp.dataLength
   };
 
-  this.emit('message', msg.data, rinfo);
+  this.emit('message', msg.data.slice(msg.offset), rinfo);
 };
 
 MockDgram.prototype._doEnd = function() {
